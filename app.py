@@ -8,7 +8,7 @@ model = joblib.load('loadshedding_model.pkl')
 
 # Initialize Flask app
 app = Flask(__name__)
-run_with_ngrok(app)  # Start ngrok when the app is run
+
 
 @app.route('/')
 def home():
@@ -34,4 +34,8 @@ def predict():
     prediction = model.predict(input_features)[0]
 
     return jsonify({'predicted_stage': int(prediction)})
+
+if __name__ == "__main__":
+    app.run()
+
 
