@@ -1,46 +1,40 @@
-import joblib
-import pandas as pd
 from flask import Flask, request, jsonify
+import pandas as pd
+import pickle
+from datetime import datetime
 
-import threading
-
-# Load the model
-model = joblib.load("loadshedding_model.pkl")
-
-# Create Flask app
 app = Flask(__name__)
 
-@app.route('/')
-def home():
-    return "Load Shedding Predictor API is Running!"
+# Load your model
+with open("loadshedding_model.pkl", "rb") as f:
+    model = pickle.load(f)
 
-@app.route('/predict', methods=['POST'])
+@app.route("/")
+def home():
+    return "Loadshedding Prediction API is live!"
+
+@app.route("/predict", methods=["POST"])
 def predict():
     data = request.get_json()
-    
+
     try:
-        # Extract inputs
-        date = pd.to_datetime(data['date'], format='%Y%m%d')
-        time = int(data['time'])
-        block = int(data['block'])
+        date_str = data["date"]
+        time_str = data["time"]
+        block = int(data["block"])
+    except (KeyError, ValueError):
+        return jsonify({"error": "Invalid input format. Required: date, time, block"}), 400
 
-        # Extract features
-        hour = time // 100
-        minute = time % 100
-        dayofweek = date.dayofweek
-        month = date.month
-
-        features = [[hour, minute, dayofweek, month, block]]
-        prediction = model.predict(features)[0]
-
-        return jsonify({'predicted_stage': int(prediction)})
-
+    try:
+        datetime_obj = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        features = pd.DataFrame({
+            "year": [datetime_obj.year],
+            "month": [datetime_obj.month],
+            "day": [datetime_obj.day],
+            "hour": [datetime_obj.hour],
+            "minute": [datetime_obj.minute],
+            "block": [block]
+        })
+        prediction = int(model.predict(features)[0])
+        return jsonify({"predicted_stage": prediction})
     except Exception as e:
-        return jsonify({'error': str(e)})
-
-# Start Flask in a thread
-def run_flask():
-    app.run(port=5000)
-
-thread = threading.Thread(target=run_flask)
-thread.start()
+        return jsonify({"error": str(e)}), 500
