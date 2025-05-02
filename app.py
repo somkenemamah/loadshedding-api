@@ -1,40 +1,37 @@
 from flask import Flask, request, jsonify
+
+import joblib
 import pandas as pd
-import pickle
-from datetime import datetime
 
+# Load the model
+model = joblib.load('loadshedding_model.pkl')
+
+# Initialize Flask app
 app = Flask(__name__)
+run_with_ngrok(app)  # Start ngrok when the app is run
 
-# Load your model
-with open("loadshedding_model.pkl", "rb") as f:
-    model = pickle.load(f)
-
-@app.route("/")
+@app.route('/')
 def home():
-    return "Loadshedding Prediction API is live!"
+    return "Load Shedding Predictor API is Running!"
 
-@app.route("/predict", methods=["POST"])
+@app.route('/predict', methods=['POST'])
 def predict():
     data = request.get_json()
+    
+    # Extract input values
+    date = pd.to_datetime(data['date'], format='%Y%m%d')
+    time = int(data['time'])
+    load_block = int(data['block'])
 
-    try:
-        date_str = data["date"]
-        time_str = data["time"]
-        block = int(data["block"])
-    except (KeyError, ValueError):
-        return jsonify({"error": "Invalid input format. Required: date, time, block"}), 400
+    # Parse time and extract features
+    hour = time // 100
+    minute = time % 100
+    day_of_week = date.dayofweek
+    month = date.month
 
-    try:
-        datetime_obj = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
-        features = pd.DataFrame({
-            "year": [datetime_obj.year],
-            "month": [datetime_obj.month],
-            "day": [datetime_obj.day],
-            "hour": [datetime_obj.hour],
-            "minute": [datetime_obj.minute],
-            "block": [block]
-        })
-        prediction = int(model.predict(features)[0])
-        return jsonify({"predicted_stage": prediction})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    # Prepare input for the model
+    input_features = [[hour, minute, day_of_week, month, load_block]]
+    prediction = model.predict(input_features)[0]
+
+    return jsonify({'predicted_stage': int(prediction)})
+
