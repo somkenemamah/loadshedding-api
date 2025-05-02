@@ -1,7 +1,7 @@
 import joblib
 import pandas as pd
 from flask import Flask, request, jsonify
-from pyngrok import ngrok
+
 import threading
 
 # Load the model
